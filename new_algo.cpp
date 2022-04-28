@@ -9,8 +9,6 @@
 
 using namespace std;
 
-int	calculate_distance(int x1, int y1, int x2, int y2);
-
 # define SUCCESS 0
 # define FAILURE (!SUCCESS)
 # define EARLY 70
@@ -78,6 +76,7 @@ typedef struct s_monstre
 	t_coor 		coor;
 	t_threat	threat;
 	int			is_focus;
+	int			focus_by;
 }	t_monstre;
 
 typedef struct s_hero
@@ -165,6 +164,22 @@ vector <t_hero>	*_hero(void)
 	return (&hero);
 }
 
+int	calculate_distance(int x1, int y1, int x2, int y2)
+{
+	int distance;
+
+	distance = sqrt(pow((x1 - x2), 2) + pow((y1 - y2), 2));
+	return (distance);
+}
+
+int	calculate_distance_to_base(t_general *general, int x, int y)
+{
+	int	distance_base;
+
+	distance_base = (calculate_distance(general->base_x, general->base_y, x, y));
+	return (distance_base);
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -222,7 +237,7 @@ void	update_entity(void)
 		scanf("%d%d%d%d%d%d%d%d%d%d%d", &entity.id, &entity.type, &entity.x, &entity.y, &entity.shield_life, 
 			&entity.is_controlled, &entity.health, &entity.vx, &entity.vy, &entity.near_base, &entity.threat_for);
 
-		entity.distance = calculate_distance(entity.x, entity.y, general->base_x, general->base_y);
+		entity.distance = calculate_distance_to_base(general, entity.x, entity.y);
 		list->push_back(entity);
 	}
 }
@@ -343,10 +358,131 @@ void	update_hero_number(int	hero_num)
 	general->hero_num = hero_num;
 }
 
+void	get_true_coor(t_general *general, int *x, int *y)
+{
+	*x = abs(general->base_x - *x);
+	*y = abs(general->base_y - *y);
+}
+
+void	move_to(int x, int y)
+{
+	printf("MOVE %d %d\n", x, y);
+}
+
+void	move_to_monstre(t_monstre monstre)
+{
+	int	x;
+	int	y;
+
+	x = monstre.coor.x + monstre.coor.vx;
+	y = monstre.coor.y + monstre.coor.vy;
+	move_to(x, y);
+}
+
+int	in_circle(int x_centre, int y_centre, int x, int y, int rayon)
+{
+	if (pow((x - x_centre), 2) + pow((y - y_centre), 2) < pow(rayon, 2))
+		return (SUCCESS);
+	return (FAILURE);
+}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int	cast_shield(void) //ajouter 3000 de distance
+int	hit_closest_to_base(t_general *general)
+{
+	vector <t_monstre>	*list;
+	t_monstre			target;
+	t_monstre			monstre;
+
+	list = _monstre();
+	if (list->size() == 0)
+		return (FAILURE);
+	target = (*list)[0];
+	for (int i = 0; i < list->size(); i++)
+	{
+		monstre = (*list)[i];
+		if (calculate_distance_to_base(general, monstre.coor.x, monstre.coor.y) <
+			calculate_distance_to_base(general, target.coor.x, target.coor.y))
+			target = monstre;
+	}
+	move_to_monstre(target);
+	return (SUCCESS);
+}
+
+
+int	no_spider_in_range(t_general *general, int x_centre, int y_centre, int rayon)
+{
+	vector <t_monstre>	*list;
+	t_monstre			monstre;
+	list = _monstre();
+
+	if (list->size() == 0)
+		return (FAILURE);
+	for (int i = 0; i < list->size(); i++)
+	{
+		monstre = (*list)[i];
+		if ((in_circle(x_centre, y_centre, monstre.coor.x, monstre.coor.y, rayon) == SUCCESS))
+			return (SUCCESS);
+	}
+	return (FAILURE);
+}
+
+int	hit_closest_in_range(t_general *general, int x_centre, int y_centre, int rayon) 
+{
+	vector <t_monstre>	*list;
+	t_monstre			monstre;
+	t_monstre			target;
+	vector	<t_hero>	*hero_list;
+	t_hero				hero;
+
+	list = _monstre();
+	hero_list = _hero();
+	if (no_spider_in_range(general, x_centre, y_centre, rayon) == FAILURE)
+		return (FAILURE);
+	hero = (*hero_list)[general->hero_num];
+	target = (*list)[0];
+	for (int i = 0; i < list->size(); i++)
+	{
+		monstre = (*list)[i];
+		if ((in_circle(x_centre, y_centre, monstre.coor.x, monstre.coor.y, rayon) == SUCCESS)
+			&& (monstre.is_focus == false)
+			&& (calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) < 
+			calculate_distance(target.coor.x, target.coor.y, hero.coor.x, hero.coor.y)))
+		{
+			target = monstre;
+			monstre.is_focus = true;
+		}
+	}
+	move_to_monstre(target);
+	return (SUCCESS);
+}
+
+int	hit_closest(t_general *general)
+{
+	vector	<t_monstre>	*list;
+	t_monstre			target;
+	t_monstre			monstre;
+	vector	<t_hero>	*hero_list;
+	t_hero				hero;
+
+	list = _monstre();
+	hero_list = _hero();
+	if (list->size() == 0)
+		return (FAILURE);
+	hero = (*hero_list)[general->hero_num];
+	target = (*list)[0];
+	for (int i = 0; i < list->size(); i++)
+	{
+		monstre = (*list)[i];
+		if (calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) < 
+			calculate_distance(target.coor.x, target.coor.y, hero.coor.x, hero.coor.y))
+			target = monstre;
+	}
+	move_to_monstre(target);
+	return (SUCCESS);
+}
+
+int	cast_shield(void) //ajouter 3000 de distance ?
 {
 	vector <t_hero>	*hero_list;
 	t_general		*general;
@@ -356,16 +492,20 @@ int	cast_shield(void) //ajouter 3000 de distance
 	hero_list = _hero();
 	hero = (*hero_list)[general->hero_num];
 
-	if (general->mana < 10)
-	{
-		dprintf(2, "out of mana\n");
-		return (FAILURE);
-	}
+
 	if (hero.was_control == true && hero.shield_life == 0)
 	{
-		printf("SHIELD %d", hero.id);
-		general->mana -= 10;
-		return (SUCCESS);
+		if (general->mana < 10)
+		{
+			dprintf(2, "out of mana\n");
+			return (FAILURE);
+		}
+		else
+		{
+			printf("SHIELD %d", hero.id);
+			general->mana -= 10;
+			return (SUCCESS);
+		}
 	}
 	return (FAILURE);
 }
@@ -380,175 +520,9 @@ void	move_to_def_pos(t_general *general)
 		printf("MOVE %d %d\n", 17630 - x, 9000 - y);
 }
 
-void	move_to_wait_pos(t_general *general, int hero)
-{
-	int	x;
-	int	y;
-
-	if (hero == 0)
-	{
-		x = 700;
-		y = 700;
-	}
-	else if (hero == 1)
-	{
-		x = 7000;
-		y = 2500;
-	}
-	else if (hero == 2)
-	{
-		x = 4000;
-		y = 5500;
-	}
-	if (general->base_x == 0)
-		printf("MOVE %d %d\n", x, y);
-	else
-		printf("MOVE %d %d\n", 17630 - x, 9000 - y);
-}
-
-void	move_to_wait_pos2(t_general *general)
-{
-	int	x = 7500;
-	int	y = 1000;
-	if (general->base_x == 0)
-		printf("MOVE %d %d\n", x, y);
-	else
-		printf("MOVE %d %d\n", 17630 - x, 9000 - y);
-}
-
-/* 
-void	move_to_target(t_entity *target, t_general *general, int hero)
-{
-    if (target->type == -1)
-        move_to_wait_pos(general, hero);
-    else
-	    printf("MOVE %d %d\n", target->x + target->vx, target->y + target->vy);
-	dprintf(2, "target x = %d, target y = %d\n", target->x, target->y);
-}
- */
-
-
-void    calculate_distance_to_base(t_entity &entity, t_general *general)
-{
-     if (entity.threat_for == 1)
-        entity.distance = sqrt(pow((entity.x - general->base_x), 2) + pow((entity.y - general->base_y), 2));
-}
-
-int	calculate_distance(int x1, int y1, int x2, int y2)
-{
-	int distance;
-
-	distance = sqrt(pow((x1 - x2), 2) + pow((y1 - y2), 2));
-	return (distance);
-}
-
-
-
-/* void    choose_target(vector <t_entity> *list, t_general *general, t_entity *target)
-{
-	target->type = -1;
-    target->distance = 0;
-	for (int i = 0; i < list->size(); i++)
-    {
-        if ((*list)[i].type == 0 && (*list)[i].distance != -1)
-        {
-            *target = (*list)[i];
-            break ;
-        }
-    }
-
-    for (int i = 0; i < (*list).size(); i++)
-    {
-
-        if ((*list)[i].distance > 0 && ((*list)[i].distance < target->distance || target->distance == 0) && (*list)[i].health > 0)
-            *target = (*list)[i];
-    }
-} */
-
-
-int	check_base_danger(vector <t_entity> *list, t_general *general) ///////////////////A reecrire
-{
-	for (int i = 0; i < list->size(); i++)
-	{
-		if ((*list)[i].distance <= 700 && (*list)[i].type == 0 && (*list)[i].threat_for == 1)
-		{
-			return (FAILURE);
-		}
-	}
-	return (SUCCESS);
-}
-
-
-void	move_to(int x, int y)
-{
-	printf("MOVE %d %d\n", x, y);
-}
-
-int	hit_closest_ennemy(vector <t_entity> &list, t_general *general) //////////////////////////////////////A CODER
-{
-	for (int i = 0; i < list.size(); i++)
-	{
-
-	}
-}
-
-/* //Defenseur
-void	hero_0(vector <t_entity> *list, t_general *general, int hero)
-{
-	if (check_base_danger(list, general) == FAILURE)
-		printf("SPELL WIND %d %d\n", 17630 - general->base_x, 9000 - general->base_y);
-	else
-		move_to_def_pos(general);
-}
-
-void	hero_1(vector <t_entity> *list, t_general *general, int hero)
-{
-	t_entity target;
-
-	choose_target(list, general, &target);
-    move_to_target(&target, general, hero);
-}
-
-void	hero_2(vector <t_entity> *list, t_general *general, int hero)
-{	
-	t_entity target;
-
-	choose_target(list, general, &target);
-    move_to_target(&target, general, hero);
-} */
-
-/* void	calculate_threat_all(vector <t_entity> *list, t_general *general)
-{
-	for (int i = 0; i < list->size(); i++)
-	{
-		if ((*list)[i].type == 0)
-            calculate_distance_to_base((*list)[i], general);
-	}
-} */
-
 void	defenseur(t_general	*general)
 {
-	
-}
-
-//pos early_defense 7500, 1500
-
-void	move_early_def_pos(int x, int y, t_general *general)
-{
-	if (general->base_x == 0)
-		move_to(x, y);
-	else
-		move_to(general->base_x - x, general->base_y - y);
-}
-
-void	move_to_monstre(t_monstre monstre)
-{
-	int	x;
-	int	y;
-
-	x = monstre.coor.x + monstre.coor.vx;
-	y = monstre.coor.y + monstre.coor.vy;
-	move_to(x, y);
+	dprintf(2, "pas encore coder LUL\n");
 }
 
 int	attack_monster_in_base(t_general *general)
@@ -560,91 +534,131 @@ int	attack_monster_in_base(t_general *general)
 	{
 		if ((*list)[i].threat.near_base == 1)
 		{
-			move_to_monstre((*list)[i]);
+			hit_closest_to_base(general);
 			return (SUCCESS);
 		}
 	}
 	return (FAILURE);
 }
 
-int	in_circle(int x_centre, int y_centre, int x, int y, int rayon)
+void	wind_to_enemy_base(t_general *general)
 {
-	if (pow((x - x_centre), 2) + pow((y - y_centre), 2) < pow(rayon, 2))
-		return (SUCCESS);
-	return (FAILURE);
+	printf("SPELL WIND %d %d\n", 17630 - general->base_x, 9000 - general->base_y);
 }
 
-//N'attaque PAS le plus proche
-int	attack_monster_in_range(int x_centre, int y_centre, t_general *general) 
+int	wind_defense(t_general *general)
 {
-	vector <t_monstre>	*list;
+	vector	<t_monstre> *list;
 	t_monstre			monstre;
-	int					rayon;
 
 	list = _monstre();
-	rayon = 2000;
 	for (int i = 0; i < list->size(); i++)
 	{
 		monstre = (*list)[i];
-		if (in_circle(x_centre, y_centre, monstre.coor.x, monstre.coor.y, rayon) == SUCCESS
-			&& (monstre.is_focus == false))
+		if (monstre.threat.distance <= 700)
 		{
-			move_to_monstre(monstre);
-			monstre.is_focus = true;
+			wind_to_enemy_base(general);
 			return (SUCCESS);
 		}
 	}
 	return (FAILURE);
 }
 
-//fonction qui rend une coor par rapport a la position de la base
-
-void	early_algo_defense(t_general *general)
+void	early_algo_hero_0(t_general *general)
 {
-	int	x = abs(general->base_x - 7500);
-	int	y = abs(general->base_y - 1500);
+	int	x = 7500;
+	int	y = 1500;
+	int range = 2500;
 
-	if(attack_monster_in_base(general) == SUCCESS)
+	get_true_coor(general, &x, &y);
+	if (wind_defense(general) == SUCCESS)
 		return ;
-	else if (attack_monster_in_range(x, y, general))
+	else if(attack_monster_in_base(general) == SUCCESS)
+		return ;
+	else if (hit_closest_in_range(general, x, y, range) == SUCCESS)
 		return ;
 	else
-		move_early_def_pos(x, y, general);
+		move_to(x, y);
+
+}
+
+void	early_algo_hero_1(t_general *general)
+{
+	int	x = 2000;
+	int	y = 7500;
+	int	range = 2500;
+
+	get_true_coor(general, &x, &y);
+/* 	if(attack_monster_in_base(general) == SUCCESS)
+		return ;
+	else  */if (hit_closest_in_range(general, x, y, range) == SUCCESS)
+		return ;
+	else
+		move_to(x, y);
+
+}
+
+void	early_algo_hero_2(t_general *general)
+{
+	int	x = 8500;
+	int	y = 7500;
+	int range = 2500;
+
+	get_true_coor(general, &x, &y);
+/* 	if(attack_monster_in_base(general) == SUCCESS)
+		return ;
+	else */ if (hit_closest_in_range(general, x, y, range) == SUCCESS)
+		return ;
+	else
+		move_to(x, y);
 
 }
 
 void	hero_0(t_general *general)
 {
-	if (general->tours < EARLY)
-		early_algo_defense(general);
-	else if (cast_shield() == SUCCESS)
+	if (cast_shield() == SUCCESS)
 		return ;
+	else if (general->tours < EARLY)
+		early_algo_hero_0(general);
 	else
 		defenseur(general);
-
 }
 
+void	hero_1(t_general *general)
+{
+	if (cast_shield() == SUCCESS)
+		return ;
+	else if (general->tours < EARLY)
+		early_algo_hero_1(general);
+	else
+		defenseur(general);
+}
+
+void	hero_2(t_general *general)
+{
+	if (cast_shield() == SUCCESS)
+		return ;
+	else if (general->tours < EARLY)
+		early_algo_hero_2(general);
+	else
+		defenseur(general);
+}
 
 void	action_algo(t_general *general)
 {
-	int	hero_num = general->hero_num;
-
+	int	hero_num;
+	
+	hero_num = general->hero_num;
 	if (hero_num == 0)
 		hero_0(general);
 	else if (hero_num == 1)
-	{
-
-	}
+		hero_1(general);
 	else if (hero_num == 2)
-	{
-
-	}
+		hero_2(general);
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 
 int main()
