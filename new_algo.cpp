@@ -11,7 +11,10 @@ using namespace std;
 
 # define SUCCESS 0
 # define FAILURE (!SUCCESS)
-# define EARLY 70
+# define EARLY 230
+# define EARLY_HERO_0 25
+# define EARLY_HERO_1 230
+# define EARLY_HERO_2 230
 
 typedef	struct	s_was_control
 {
@@ -482,18 +485,29 @@ int	hit_closest(t_general *general)
 	return (SUCCESS);
 }
 
-int	cast_shield(void) //ajouter 3000 de distance ?
+int	cast_shield(void) //ajouter 2200 de distance ?
 {
-	vector <t_hero>	*hero_list;
+	vector <t_hero>		*hero_list;
+	vector <t_enemy>	*enemy_list;
 	t_general		*general;
 	t_hero			hero;
+	t_enemy			enemy;
+	int				danger;
 
 	general = _general();
 	hero_list = _hero();
+	enemy_list = _enemy();
 	hero = (*hero_list)[general->hero_num];
+	danger = 0;
 
 
-	if (hero.was_control == true && hero.shield_life == 0)
+	for (int i = 0; i < enemy_list->size(); i++)
+	{
+		enemy = (*enemy_list)[i];
+		if (calculate_distance(enemy.coor.x, enemy.coor.y, hero.coor.x, hero.coor.y) <= 2200)
+			danger = 1;
+	}
+	if (danger == 1 && hero.was_control == true && hero.shield_life == 0)
 	{
 		if (general->mana < 10)
 		{
@@ -502,7 +516,7 @@ int	cast_shield(void) //ajouter 3000 de distance ?
 		}
 		else
 		{
-			printf("SHIELD %d", hero.id);
+			printf("SPELL SHIELD %d\n", hero.id);
 			general->mana -= 10;
 			return (SUCCESS);
 		}
@@ -518,11 +532,6 @@ void	move_to_def_pos(t_general *general)
 		printf("MOVE %d %d\n", x, y);
 	else
 		printf("MOVE %d %d\n", 17630 - x, 9000 - y);
-}
-
-void	defenseur(t_general	*general)
-{
-	dprintf(2, "pas encore coder LUL\n");
 }
 
 int	attack_monster_in_base(t_general *general)
@@ -584,7 +593,7 @@ void	early_algo_hero_0(t_general *general)
 
 void	early_algo_hero_1(t_general *general)
 {
-	int	x = 2000;
+	int	x = 3500;
 	int	y = 7500;
 	int	range = 2500;
 
@@ -614,11 +623,28 @@ void	early_algo_hero_2(t_general *general)
 
 }
 
+void	defenseur (t_general *general)
+{
+	int x = 1500;
+	int y = 1500;
+	int range = 2000;
+
+	get_true_coor(general, &x, &y);
+	if (wind_defense(general) == SUCCESS)
+		return ;
+	else if (attack_monster_in_base(general) == SUCCESS)
+		return ;
+	else if (hit_closest_in_range(general, x, y, range) == SUCCESS)
+		return ;
+	else
+		move_to(x, y);
+}
+
 void	hero_0(t_general *general)
 {
 	if (cast_shield() == SUCCESS)
 		return ;
-	else if (general->tours < EARLY)
+	else if (general->tours < EARLY_HERO_0)
 		early_algo_hero_0(general);
 	else
 		defenseur(general);
@@ -628,7 +654,7 @@ void	hero_1(t_general *general)
 {
 	if (cast_shield() == SUCCESS)
 		return ;
-	else if (general->tours < EARLY)
+	else if (general->tours < EARLY_HERO_1)
 		early_algo_hero_1(general);
 	else
 		defenseur(general);
@@ -638,7 +664,7 @@ void	hero_2(t_general *general)
 {
 	if (cast_shield() == SUCCESS)
 		return ;
-	else if (general->tours < EARLY)
+	else if (general->tours < EARLY_HERO_2)
 		early_algo_hero_2(general);
 	else
 		defenseur(general);
