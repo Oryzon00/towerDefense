@@ -13,8 +13,8 @@ using namespace std;
 # define FAILURE (!SUCCESS)
 # define EARLY 230
 # define EARLY_HERO_0 25
-# define EARLY_HERO_1 230
-# define EARLY_HERO_2 230
+# define EARLY_HERO_1 45
+# define EARLY_HERO_2 45
 
 typedef	struct	s_was_control
 {
@@ -22,6 +22,12 @@ typedef	struct	s_was_control
 	int	hero_1;
 	int	hero_2;
 }	t_was_control;
+
+typedef struct	s_atk
+{
+	int set_up;
+	int	patrouille;
+}	t_atk;
 
 typedef	struct s_general
 {
@@ -36,7 +42,16 @@ typedef	struct s_general
 	t_was_control	was_control;
 	int				hero_num;
 	int				tours;
+	t_atk			atk;			
 }	t_general;
+
+typedef struct	s_patrouille
+{
+	int	xA;
+	int yA;
+	int xB;;
+	int yB;
+}	t_patrouille;
 
 
 typedef	struct s_entity
@@ -183,6 +198,14 @@ int	calculate_distance_to_base(t_general *general, int x, int y)
 	return (distance_base);
 }
 
+int	calculate_distance_to_enemy(t_general *general, int x, int y)
+{
+	int	distance_base;
+
+	distance_base = (calculate_distance(17630 - general->base_x, 9000 - general->base_y, x, y));
+	return (distance_base);
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -196,6 +219,8 @@ void	fill_general(void)
 	general->was_control.hero_0 = false;
 	general->was_control.hero_1 = false;
 	general->was_control.hero_2 = false;
+	general->atk.set_up = false;
+	general->atk.patrouille = 0;
 }
 
 void	update_general(int	tours)
@@ -485,7 +510,7 @@ int	hit_closest(t_general *general)
 	return (SUCCESS);
 }
 
-int	cast_shield(void) //ajouter 2200 de distance ?
+int	cast_shield(void)
 {
 	vector <t_hero>		*hero_list;
 	vector <t_enemy>	*enemy_list;
@@ -507,7 +532,7 @@ int	cast_shield(void) //ajouter 2200 de distance ?
 		if (calculate_distance(enemy.coor.x, enemy.coor.y, hero.coor.x, hero.coor.y) <= 2200)
 			danger = 1;
 	}
-	if (danger == 1 && hero.was_control == true && hero.shield_life == 0)
+	if (danger == 1 && hero.was_control == true && (hero.shield_life == 0)) //attention
 	{
 		if (general->mana < 10)
 		{
@@ -522,16 +547,6 @@ int	cast_shield(void) //ajouter 2200 de distance ?
 		}
 	}
 	return (FAILURE);
-}
-
-void	move_to_def_pos(t_general *general)
-{
-	int	x = 700;
-	int	y = 700;
-	if (general->base_x == 0)
-		printf("MOVE %d %d\n", x, y);
-	else
-		printf("MOVE %d %d\n", 17630 - x, 9000 - y);
 }
 
 int	attack_monster_in_base(t_general *general)
@@ -575,7 +590,7 @@ int	wind_defense(t_general *general)
 
 void	early_algo_hero_0(t_general *general)
 {
-	int	x = 7500;
+	int	x = 9000;
 	int	y = 1500;
 	int range = 2500;
 
@@ -593,7 +608,7 @@ void	early_algo_hero_0(t_general *general)
 
 void	early_algo_hero_1(t_general *general)
 {
-	int	x = 3500;
+	int	x = 4800;
 	int	y = 7500;
 	int	range = 2500;
 
@@ -623,7 +638,7 @@ void	early_algo_hero_2(t_general *general)
 
 }
 
-void	defenseur (t_general *general)
+void	defenseur(t_general *general)
 {
 	int x = 1500;
 	int y = 1500;
@@ -639,6 +654,242 @@ void	defenseur (t_general *general)
 	else
 		move_to(x, y);
 }
+
+void	check_patrouille(t_general *general, t_patrouille *patrouille)
+{
+	vector <t_hero> *hero_list;
+
+	hero_list = _hero();
+	if (general->atk.patrouille == 0
+		&& (*hero_list)[1].coor.x == patrouille->xB
+		&&  (*hero_list)[1].coor.y == patrouille->yB)
+		general->atk.patrouille = 1;
+	if (general->atk.patrouille == 1
+		&& (*hero_list)[1].coor.x == patrouille->xA
+		&&  (*hero_list)[1].coor.y == patrouille->yA)
+		general->atk.patrouille = 0; 
+}
+
+int	patrouille_attaque(t_general *general, t_patrouille *patrouille)
+{
+	check_patrouille(general, patrouille);
+	if (general->atk.patrouille == 0)
+		move_to(patrouille->xB, patrouille->yB);
+	else if (general->atk.patrouille == 1)
+		move_to(patrouille->xA, patrouille->yA);
+}
+
+void	check_end_set_up(t_general *general, t_patrouille *patrouille)
+{
+	vector <t_hero> *hero_list;
+
+	hero_list = _hero();
+	if ((general->atk.set_up == false) 
+		&& ((*hero_list)[1].coor.x == patrouille->xA)
+		&& ((*hero_list)[1].coor.y == patrouille->yA))
+		{
+			general->atk.set_up = true;
+		}
+}
+
+void	set_up(t_general *general, t_patrouille *patrouille)
+{
+	int xA = patrouille->xA;
+	int yA = patrouille->yA;
+
+	move_to(xA, yA);
+	dprintf(2, "go set_up\n");
+}
+
+void	init_patrouille_coor(t_general *general, t_patrouille *patrouille)
+{
+	int xA = 11700;
+	int yA = 8000;
+	int xB = 14500;
+	int yB = 4000;
+
+	get_true_coor(general, &xA, &yA);
+	get_true_coor(general, &xB, &yB);
+	patrouille->xA = xA;
+	patrouille->xB = xB;
+	patrouille->yA = yA;
+	patrouille->yB = yB;
+}
+
+int	cannon_1(t_general *general)
+{
+	vector <t_monstre>	*list_monstre;
+	vector	<t_hero>	*list_hero;
+	t_hero				hero;
+	t_monstre			monstre;
+	int					cible_x;
+	int					cible_y;
+
+	list_monstre = _monstre();
+	list_hero = _hero();
+	hero = (*list_hero)[general->hero_num];
+
+	for (int i = 0; i < list_monstre->size(); i++)
+	{
+		monstre = (*list_monstre)[i];
+		if (calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) <= 1280
+			&& calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) > 920
+			&& calculate_distance_to_enemy(general, monstre.coor.x, monstre.coor.y) < 6900
+			&&(calculate_distance(monstre.coor.x, monstre.coor.y, 17630 - general->base_x, 9000 - general->base_y)
+			> calculate_distance(hero.coor.x, hero.coor.y, 17630 - general->base_x, 9000 - general->base_y)))
+			{
+				cible_x = hero.coor.x + 17630 - general->base_x - monstre.coor.x;
+				cible_y = hero.coor.y + 9000 - general->base_y - monstre.coor.y;
+				if (general->hero_num == 1)
+					printf("SPELL WIND %d %d\n", cible_x, cible_y);
+				else
+					printf("WAIT\n");
+				return (SUCCESS);
+			}
+	}
+	return (FAILURE);
+}
+
+int	cannon_2(t_general *general)
+{
+	vector <t_monstre>	*list_monstre;
+	vector	<t_hero>	*list_hero;
+	t_hero				hero;
+	t_monstre			monstre;
+	int					cible_x;
+	int					cible_y;
+
+	list_monstre = _monstre();
+	list_hero = _hero();
+	hero = (*list_hero)[general->hero_num];
+
+	for (int i = 0; i < list_monstre->size(); i++)
+	{
+		monstre = (*list_monstre)[i];
+		if (calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) <= 1280
+			&& calculate_distance_to_enemy(general, monstre.coor.x, monstre.coor.y) < 4700
+			&&(calculate_distance(monstre.coor.x, monstre.coor.y, 17630 - general->base_x, 9000 - general->base_y)
+			<= calculate_distance(hero.coor.x, hero.coor.y, 17630 - general->base_x, 9000 - general->base_y)))
+			{
+				cible_x = hero.coor.x + 17630 - general->base_x - monstre.coor.x;
+				cible_y = hero.coor.y + 9000 - general->base_y - monstre.coor.y;
+				printf("SPELL WIND %d %d\n", cible_x, cible_y);
+				return (SUCCESS);
+			}
+	}
+	return (FAILURE);
+}
+
+int	thales_x(t_general *general, int x, int range, int distance)
+{
+	int thales;
+
+	thales = ((distance - range) * abs(17630 - general->base_x - x)) / distance;
+	return(abs(17630 - general->base_x - thales));
+}
+
+int	thales_y(t_general *general, int y, int range, int distance)
+{
+	int thales;
+
+	thales = ((distance - range) * abs(9000 - general->base_y - y)) / distance;
+	return(abs(9000 - general->base_y - thales));
+}
+
+t_coor	find_hero_goal(t_general *general, int x_mon, int y_mon)
+{
+	t_coor goal;
+	int range;
+
+	range = 1000;
+
+	goal.x = thales_x(general, x_mon, range, calculate_distance_to_enemy(general, x_mon, y_mon));
+	goal.y = thales_y(general, y_mon, range, calculate_distance_to_enemy(general, x_mon, y_mon));
+	return (goal);
+}
+
+int	ammo_available(t_general *general)
+{
+	vector	<t_monstre>	*list_monstre;
+	vector	<t_hero>	*list_hero;
+	t_monstre			monstre;
+	t_hero				hero;
+	t_coor				goal;
+
+	list_monstre = _monstre();
+	list_hero = _hero();
+	hero = (*list_hero)[general->hero_num];
+	for (int i = 0; i < list_monstre->size(); i++)
+	{
+		monstre = (*list_monstre)[i];
+		if (calculate_distance_to_enemy(general, monstre.coor.x + monstre.coor.vx, monstre.coor.y + monstre.coor.vy) < 6900)
+		{
+			goal = find_hero_goal(general, monstre.coor.x + monstre.coor.vx, monstre.coor.y + monstre.coor.vy);
+			//dprintf(2, "target +1 = %d\n goal.x = %d\n goal.y = %d\n\n", monstre.id, goal.x, goal.y);
+
+			if (calculate_distance(goal.x, goal.y, hero.coor.x, hero.coor.y) <= 800)
+			{
+				move_to(goal.x, goal.y);
+				//dprintf(2, "distance < 800\n");
+				//dprintf(2, "target +2 = %d\n goal.x = %d\n goal.y = %d\n\n", monstre.id, goal.x, goal.y);
+				return (SUCCESS);
+			}
+		}
+	}
+	return (FAILURE);
+}
+
+int	ammo_available_future(t_general *general)
+{
+	vector	<t_monstre>	*list_monstre;
+	vector	<t_hero>	*list_hero;
+	t_monstre			monstre;
+	t_hero				hero;
+	t_coor				goal;
+
+	list_monstre = _monstre();
+	list_hero = _hero();
+	hero = (*list_hero)[general->hero_num];
+	for (int i = 0; i < list_monstre->size(); i++)
+	{
+		monstre = (*list_monstre)[i];
+		if (calculate_distance_to_enemy(general, monstre.coor.x + 2 * monstre.coor.vx, monstre.coor.y + 2 * monstre.coor.vy) < 6900)
+		{
+			goal = find_hero_goal(general, monstre.coor.x + 2 * monstre.coor.vx, monstre.coor.y + 2 * monstre.coor.vy);
+			//dprintf(2, "target +2 = %d\n goal.x = %d\n goal.y = %d\n\n", monstre.id, goal.x, goal.y);
+
+			if (calculate_distance(goal.x, goal.y, hero.coor.x, hero.coor.y) <= 1600)
+			{
+				move_to(goal.x, goal.y);
+				//dprintf(2, "distance < 1600\n");
+				//dprintf(2, "target +2 = %d\n goal.x = %d\n goal.y = %d\n\n", monstre.id, goal.x, goal.y);
+				return (SUCCESS);
+			}
+		}
+	}
+	return (FAILURE);
+}
+
+void	attaquant(t_general *general)
+{
+	t_patrouille	patrouille;
+
+	init_patrouille_coor(general, &patrouille);
+	check_end_set_up(general, &patrouille);
+	if (general->atk.set_up == false)
+		set_up(general, &patrouille);
+	else if (cannon_1(general) == SUCCESS)
+		return ;
+	else if (cannon_2(general) == SUCCESS)
+		return ;
+	else if (ammo_available(general) == SUCCESS)
+		return ;
+	else if (ammo_available_future(general) == SUCCESS)
+		return ;
+	else
+		patrouille_attaque(general, &patrouille);
+}
+
 
 void	hero_0(t_general *general)
 {
@@ -657,7 +908,7 @@ void	hero_1(t_general *general)
 	else if (general->tours < EARLY_HERO_1)
 		early_algo_hero_1(general);
 	else
-		defenseur(general);
+		attaquant(general);
 }
 
 void	hero_2(t_general *general)
@@ -667,7 +918,7 @@ void	hero_2(t_general *general)
 	else if (general->tours < EARLY_HERO_2)
 		early_algo_hero_2(general);
 	else
-		defenseur(general);
+		attaquant(general);
 }
 
 void	action_algo(t_general *general)
