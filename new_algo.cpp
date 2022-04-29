@@ -13,8 +13,8 @@ using namespace std;
 # define FAILURE (!SUCCESS)
 # define EARLY 230
 # define EARLY_HERO_0 25
-# define EARLY_HERO_1 45
-# define EARLY_HERO_2 45
+# define EARLY_HERO_1 35
+# define EARLY_HERO_2 35
 
 typedef	struct	s_was_control
 {
@@ -27,6 +27,7 @@ typedef struct	s_atk
 {
 	int set_up;
 	int	patrouille;
+	int	mana_ready;
 }	t_atk;
 
 typedef	struct s_general
@@ -222,6 +223,7 @@ void	fill_general(void)
 	general->was_control.hero_2 = false;
 	general->atk.set_up = false;
 	general->atk.patrouille = 0;
+	general->atk.mana_ready = false;
 	general->cannon_ready = false;
 }
 
@@ -581,7 +583,7 @@ int	wind_defense(t_general *general)
 	for (int i = 0; i < list->size(); i++)
 	{
 		monstre = (*list)[i];
-		if (monstre.threat.distance <= 700)
+		if (monstre.threat.distance <= 700 && monstre.shield_life == 0)
 		{
 			wind_to_enemy_base(general);
 			return (SUCCESS);
@@ -895,6 +897,12 @@ void	attaquant(t_general *general)
 		patrouille_attaque(general, &patrouille);
 }
 
+void	check_mana(t_general *general)
+{
+	if (general->mana >= 90)
+		general->atk.mana_ready = true;
+}
+
 void	hero_0(t_general *general)
 {
 	if (cast_shield() == SUCCESS)
@@ -907,9 +915,10 @@ void	hero_0(t_general *general)
 
 void	hero_1(t_general *general)
 {
+	check_mana(general);
 	if (cast_shield() == SUCCESS)
 		return ;
-	else if (general->tours < EARLY_HERO_1)
+	else if (general->atk.mana_ready == false)
 		early_algo_hero_1(general);
 	else
 		attaquant(general);
@@ -917,9 +926,10 @@ void	hero_1(t_general *general)
 
 void	hero_2(t_general *general)
 {
+	check_mana(general);
 	if (cast_shield() == SUCCESS)
 		return ;
-	else if (general->tours < EARLY_HERO_2)
+	else if (general->atk.mana_ready == false)
 		early_algo_hero_2(general);
 	else
 		attaquant(general);
@@ -941,7 +951,7 @@ void	action_algo(t_general *general)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+//check
 int main()
 {
 	t_general	*general;
