@@ -42,6 +42,7 @@ typedef	struct s_general
 	t_was_control	was_control;
 	int				hero_num;
 	int				tours;
+	int				cannon_ready;
 	t_atk			atk;			
 }	t_general;
 
@@ -221,6 +222,7 @@ void	fill_general(void)
 	general->was_control.hero_2 = false;
 	general->atk.set_up = false;
 	general->atk.patrouille = 0;
+	general->cannon_ready = false;
 }
 
 void	update_general(int	tours)
@@ -732,7 +734,8 @@ int	cannon_1(t_general *general)
 	for (int i = 0; i < list_monstre->size(); i++)
 	{
 		monstre = (*list_monstre)[i];
-		if (calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) <= 1280
+		if (general->cannon_ready == true
+			&& calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) <= 1280
 			&& calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) > 920
 			&& calculate_distance_to_enemy(general, monstre.coor.x, monstre.coor.y) < 6900
 			&&(calculate_distance(monstre.coor.x, monstre.coor.y, 17630 - general->base_x, 9000 - general->base_y)
@@ -774,6 +777,7 @@ int	cannon_2(t_general *general)
 				cible_x = hero.coor.x + 17630 - general->base_x - monstre.coor.x;
 				cible_y = hero.coor.y + 9000 - general->base_y - monstre.coor.y;
 				printf("SPELL WIND %d %d\n", cible_x, cible_y);
+				general->cannon_ready = false;
 				return (SUCCESS);
 			}
 	}
@@ -830,6 +834,7 @@ int	ammo_available(t_general *general)
 			if (calculate_distance(goal.x, goal.y, hero.coor.x, hero.coor.y) <= 800)
 			{
 				move_to(goal.x, goal.y);
+				general->cannon_ready = true;
 				//dprintf(2, "distance < 800\n");
 				//dprintf(2, "target +2 = %d\n goal.x = %d\n goal.y = %d\n\n", monstre.id, goal.x, goal.y);
 				return (SUCCESS);
@@ -878,9 +883,9 @@ void	attaquant(t_general *general)
 	check_end_set_up(general, &patrouille);
 	if (general->atk.set_up == false)
 		set_up(general, &patrouille);
-	else if (cannon_1(general) == SUCCESS)
-		return ;
 	else if (cannon_2(general) == SUCCESS)
+		return ;
+	else if (cannon_1(general) == SUCCESS)
 		return ;
 	else if (ammo_available(general) == SUCCESS)
 		return ;
@@ -889,7 +894,6 @@ void	attaquant(t_general *general)
 	else
 		patrouille_attaque(general, &patrouille);
 }
-
 
 void	hero_0(t_general *general)
 {
