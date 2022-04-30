@@ -12,9 +12,9 @@ using namespace std;
 # define SUCCESS 0
 # define FAILURE (!SUCCESS)
 # define EARLY 230
-# define EARLY_HERO_0 25
-# define EARLY_HERO_1 35
-# define EARLY_HERO_2 35
+# define EARLY_HERO_0 35
+# define EARLY_HERO_1 40
+# define EARLY_HERO_2 EARLY_HERO_1 + 5
 
 typedef	struct	s_was_control
 {
@@ -44,6 +44,7 @@ typedef	struct s_general
 	int				hero_num;
 	int				tours;
 	int				cannon_ready;
+	int				spider_on_the_way;
 	t_atk			atk;			
 }	t_general;
 
@@ -225,6 +226,7 @@ void	fill_general(void)
 	general->atk.patrouille = 0;
 	general->atk.mana_ready = false;
 	general->cannon_ready = false;
+	general->spider_on_the_way = false;
 }
 
 void	update_general(int	tours)
@@ -543,7 +545,7 @@ int	cast_shield(void)
 			dprintf(2, "out of mana\n");
 			return (FAILURE);
 		}
-		else
+		else if (general->enemy_health > 1)
 		{
 			printf("SPELL SHIELD %d\n", hero.id);
 			general->mana -= 10;
@@ -569,32 +571,111 @@ int	attack_monster_in_base(t_general *general)
 	return (FAILURE);
 }
 
-void	wind_to_enemy_base(t_general *general)
+int	enemy_in_base_and_close_spider(t_general *general, t_monstre monstre)
 {
-	printf("SPELL WIND %d %d\n", 17630 - general->base_x, 9000 - general->base_y);
+	vector <t_enemy> *list_enemy;
+	t_enemy			enemy;
+
+	list_enemy = _enemy();
+	for (int i = 0; i < list_enemy->size(); i++)
+	{
+		enemy = (*list_enemy)[i];
+		if (calculate_distance(enemy.coor.x, enemy.coor.y, general->base_x, general->base_y) < 5000
+			&& calculate_distance(enemy.coor.x, enemy.coor.y, monstre.coor.x, monstre.coor.y) <= 1280)
+			return (SUCCESS);
+	}
+	return (FAILURE);
+
+}
+
+void	wind_out_of_base(t_general *general)
+{
+	printf("SPELL WIND %d %d\n", 17630, 1000);
 }
 
 int	wind_defense(t_general *general)
 {
 	vector	<t_monstre> *list;
 	t_monstre			monstre;
+	vector <t_hero>		*list_hero;
+	t_hero				hero;
+	vector <t_enemy> *list_enemy;
+	t_enemy			enemy;
 
+	list_enemy = _enemy();
 	list = _monstre();
+	list_hero = _hero();
+	hero = (*list_hero)[0];
 	for (int i = 0; i < list->size(); i++)
 	{
 		monstre = (*list)[i];
-		if (monstre.threat.distance <= 700 && monstre.shield_life == 0)
+		if (enemy_in_base_and_close_spider(general, monstre) == SUCCESS)
 		{
-			wind_to_enemy_base(general);
-			return (SUCCESS);
+			if (monstre.threat.distance <= 2500
+				&& monstre.shield_life == 0
+				&& calculate_distance(hero.coor.x, hero.coor.y, monstre.coor.x, monstre.coor.y) <= 1280)
+				{
+					wind_out_of_base(general);
+					return (SUCCESS);
+				}
+		}
+		else
+		{
+			if (monstre.threat.distance <= 700 
+				&& monstre.shield_life == 0
+				&& calculate_distance(hero.coor.x, hero.coor.y, monstre.coor.x, monstre.coor.y) <= 1280)
+			{
+				wind_out_of_base(general);
+				return (SUCCESS);
+			}
 		}
 	}
 	return (FAILURE);
 }
 
+int	thales_x(t_general *general, int x, int range, int distance)
+{
+	int thales;
+
+	thales = ((distance - range) * abs(17630 - general->base_x - x)) / distance;
+	return(abs(17630 - general->base_x - thales));
+}
+
+int	thales_y(t_general *general, int y, int range, int distance)
+{
+	int thales;
+
+	thales = ((distance - range) * abs(9000 - general->base_y - y)) / distance;
+	return(abs(9000 - general->base_y - thales));
+}
+
+t_coor	find_hero_goal(t_general *general, int x_mon, int y_mon)
+{
+	t_coor goal;
+	int range;
+
+	range = 1000;
+
+	goal.x = thales_x(general, x_mon, range, calculate_distance_to_enemy(general, x_mon, y_mon));
+	goal.y = thales_y(general, y_mon, range, calculate_distance_to_enemy(general, x_mon, y_mon));
+	return (goal);
+}
+
+t_coor	futur_wind_spider_pos(t_general *general, int x_mon, int y_mon)
+{
+	t_coor goal;
+	int range;
+
+	range = 2200;
+
+	goal.x = thales_x(general, x_mon, range, calculate_distance_to_enemy(general, x_mon, y_mon));
+	goal.y = thales_y(general, y_mon, range, calculate_distance_to_enemy(general, x_mon, y_mon));
+	return (goal);
+}
+
 void	early_algo_hero_0(t_general *general)
 {
-	int	x = 9000;
+	int	x = 7500;
 	int	y = 1500;
 	int range = 2500;
 
@@ -696,13 +777,57 @@ void	check_end_set_up(t_general *general, t_patrouille *patrouille)
 		}
 }
 
-void	set_up(t_general *general, t_patrouille *patrouille)
+void	set_up_1(t_general *general, t_patrouille *patrouille)
+{
+	vector <t_monstre> *list_monstre;
+	t_monstre			monstre;
+	vector <t_hero>		*list_hero;
+	t_hero				hero;
+	int					found = false;
+	int					xA = 12900;
+	int					yA = 8000;
+	static int			max_control = 0;
+
+	list_monstre = _monstre();
+	list_hero = _hero();
+	hero = (*list_hero)[general->hero_num];
+	get_true_coor(general, &xA, &yA);
+	for (int i = 0; i < list_monstre->size(); i++)
+	{
+		monstre = (*list_monstre)[i];
+		if (monstre.threat.threat_for != 2
+			&& calculate_distance(hero.coor.x, hero.coor.y, monstre.coor.x, monstre.coor.y) <= 2200
+			&& found == false
+			&& max_control < 4
+			&& monstre.health > 4
+			&& (calculate_distance_to_enemy(general, hero.coor.x, hero.coor.y)
+			< calculate_distance_to_enemy(general, monstre.coor.x, monstre.coor.y)))
+		{
+			printf("SPELL CONTROL %d %d %d\n", monstre.id, xA, yA);
+			max_control++;
+			found = true;
+		}
+	}
+	if (found == false)
+		move_to(patrouille->xA, patrouille->yA);
+	dprintf(2, "go set_up\n");
+}
+
+void	set_up_2(t_general *general, t_patrouille *patrouille)
 {
 	int xA = patrouille->xA;
 	int yA = patrouille->yA;
 
 	move_to(xA, yA);
 	dprintf(2, "go set_up\n");
+}
+
+void	set_up(t_general *general, t_patrouille *patrouille)
+{
+	if (general->hero_num == 1)
+		set_up_1(general, patrouille);
+	else if (general->hero_num == 2)
+		set_up_2(general, patrouille);
 }
 
 void	init_patrouille_coor(t_general *general, t_patrouille *patrouille)
@@ -718,6 +843,21 @@ void	init_patrouille_coor(t_general *general, t_patrouille *patrouille)
 	patrouille->xB = xB;
 	patrouille->yA = yA;
 	patrouille->yB = yB;
+}
+
+int	futur_pos_of_spider_wind(t_general *general, int x_mon, int y_mon)
+{
+	t_coor 			futur_pos;
+	vector <t_hero>	*list_hero;
+	t_hero			hero;
+
+	list_hero = _hero();
+	hero = (*list_hero)[1];
+	futur_pos = futur_wind_spider_pos(general, x_mon, y_mon);
+	if (calculate_distance(hero.coor.x, hero.coor.y, futur_pos.x, futur_pos.y) <= 1280)
+		return (SUCCESS);
+	else
+		return (FAILURE);
 }
 
 int	cannon_1(t_general *general)
@@ -736,12 +876,14 @@ int	cannon_1(t_general *general)
 	for (int i = 0; i < list_monstre->size(); i++)
 	{
 		monstre = (*list_monstre)[i];
-		if (general->cannon_ready == true
-			&& calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) <= 1280
-			&& calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) > 920
-			&& calculate_distance_to_enemy(general, monstre.coor.x, monstre.coor.y) < 6900
-			&&(calculate_distance(monstre.coor.x, monstre.coor.y, 17630 - general->base_x, 9000 - general->base_y)
-			> calculate_distance(hero.coor.x, hero.coor.y, 17630 - general->base_x, 9000 - general->base_y)))
+		if (
+			// && calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) <= 1280
+			// && calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) > 920
+			calculate_distance_to_enemy(general, monstre.coor.x, monstre.coor.y) < 6900
+			// && (calculate_distance(monstre.coor.x, monstre.coor.y, 17630 - general->base_x, 9000 - general->base_y)
+			// > calculate_distance(hero.coor.x, hero.coor.y, 17630 - general->base_x, 9000 - general->base_y))
+			&& general->mana >= 30
+			&& futur_pos_of_spider_wind(general, monstre.coor.x, monstre.coor.y) == SUCCESS)
 			{
 				cible_x = hero.coor.x + 17630 - general->base_x - monstre.coor.x;
 				cible_y = hero.coor.y + 9000 - general->base_y - monstre.coor.y;
@@ -786,33 +928,7 @@ int	cannon_2(t_general *general)
 	return (FAILURE);
 }
 
-int	thales_x(t_general *general, int x, int range, int distance)
-{
-	int thales;
 
-	thales = ((distance - range) * abs(17630 - general->base_x - x)) / distance;
-	return(abs(17630 - general->base_x - thales));
-}
-
-int	thales_y(t_general *general, int y, int range, int distance)
-{
-	int thales;
-
-	thales = ((distance - range) * abs(9000 - general->base_y - y)) / distance;
-	return(abs(9000 - general->base_y - thales));
-}
-
-t_coor	find_hero_goal(t_general *general, int x_mon, int y_mon)
-{
-	t_coor goal;
-	int range;
-
-	range = 1000;
-
-	goal.x = thales_x(general, x_mon, range, calculate_distance_to_enemy(general, x_mon, y_mon));
-	goal.y = thales_y(general, y_mon, range, calculate_distance_to_enemy(general, x_mon, y_mon));
-	return (goal);
-}
 
 int	ammo_available(t_general *general)
 {
@@ -831,14 +947,11 @@ int	ammo_available(t_general *general)
 		if (calculate_distance_to_enemy(general, monstre.coor.x + monstre.coor.vx, monstre.coor.y + monstre.coor.vy) < 6900)
 		{
 			goal = find_hero_goal(general, monstre.coor.x + monstre.coor.vx, monstre.coor.y + monstre.coor.vy);
-			//dprintf(2, "target +1 = %d\n goal.x = %d\n goal.y = %d\n\n", monstre.id, goal.x, goal.y);
 
 			if (calculate_distance(goal.x, goal.y, hero.coor.x, hero.coor.y) <= 800)
 			{
 				move_to(goal.x, goal.y);
-				general->cannon_ready = true;
-				//dprintf(2, "distance < 800\n");
-				//dprintf(2, "target +2 = %d\n goal.x = %d\n goal.y = %d\n\n", monstre.id, goal.x, goal.y);
+				general->cannon_ready++;
 				return (SUCCESS);
 			}
 		}
@@ -863,16 +976,38 @@ int	ammo_available_future(t_general *general)
 		if (calculate_distance_to_enemy(general, monstre.coor.x + 2 * monstre.coor.vx, monstre.coor.y + 2 * monstre.coor.vy) < 6900)
 		{
 			goal = find_hero_goal(general, monstre.coor.x + 2 * monstre.coor.vx, monstre.coor.y + 2 * monstre.coor.vy);
-			//dprintf(2, "target +2 = %d\n goal.x = %d\n goal.y = %d\n\n", monstre.id, goal.x, goal.y);
-
 			if (calculate_distance(goal.x, goal.y, hero.coor.x, hero.coor.y) <= 1600)
 			{
 				move_to(goal.x, goal.y);
-				//dprintf(2, "distance < 1600\n");
-				//dprintf(2, "target +2 = %d\n goal.x = %d\n goal.y = %d\n\n", monstre.id, goal.x, goal.y);
 				return (SUCCESS);
 			}
 		}
+	}
+	return (FAILURE);
+}
+
+int find_spider_to_control(t_general *general, t_patrouille patrouille)
+{
+	vector <t_hero>		*list_hero;
+	vector <t_monstre>	*list_monstre;
+	t_hero				hero;
+	t_monstre			monstre;
+
+	list_hero = _hero();
+	list_monstre = _monstre();
+	hero = (*list_hero)[general->hero_num];
+	for (int i = 0; i < list_monstre->size(); i++)
+	{
+		monstre = (*list_monstre)[i];
+		if (calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) <= 2200
+			&& general->mana >= 40
+			&& monstre.threat.near_base == 0)
+		{
+			general->spider_on_the_way = true;
+			printf("SPELL CONTROL %d %d %d\n", monstre.id, patrouille.xA, patrouille.yA);
+			return (SUCCESS);
+		}
+
 	}
 	return (FAILURE);
 }
@@ -883,6 +1018,7 @@ void	attaquant(t_general *general)
 
 	init_patrouille_coor(general, &patrouille);
 	check_end_set_up(general, &patrouille);
+	//dprintf(2, "cannon ready = %d\n", general->cannon_ready);
 	if (general->atk.set_up == false)
 		set_up(general, &patrouille);
 	else if (cannon_2(general) == SUCCESS)
@@ -893,8 +1029,13 @@ void	attaquant(t_general *general)
 		return ;
 	else if (ammo_available_future(general) == SUCCESS)
 		return ;
+	//spider on the way ici ?
+	else if (find_spider_to_control(general, patrouille) == SUCCESS)
+		return ;
+	else if (general->spider_on_the_way == true) //ici ou en haut
+		move_to(patrouille.xA, patrouille.yA);
 	else
-		patrouille_attaque(general, &patrouille);
+		move_to(patrouille.xA - 1600, patrouille.yA);
 }
 
 void	check_mana(t_general *general)
@@ -918,7 +1059,9 @@ void	hero_1(t_general *general)
 	check_mana(general);
 	if (cast_shield() == SUCCESS)
 		return ;
-	else if (general->atk.mana_ready == false)
+	// else if (general->atk.mana_ready == false)
+	// 	early_algo_hero_1(general);
+	else if (general->tours < EARLY_HERO_1)
 		early_algo_hero_1(general);
 	else
 		attaquant(general);
@@ -929,7 +1072,9 @@ void	hero_2(t_general *general)
 	check_mana(general);
 	if (cast_shield() == SUCCESS)
 		return ;
-	else if (general->atk.mana_ready == false)
+	// else if (general->atk.mana_ready == false)
+	// 	early_algo_hero_2(general);
+	else if (general->tours < EARLY_HERO_2)
 		early_algo_hero_2(general);
 	else
 		attaquant(general);
