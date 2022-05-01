@@ -45,6 +45,7 @@ typedef	struct s_general
 	int				tours;
 	int				cannon_ready;
 	int				spider_on_the_way;
+	int				wait_spider_on_the_way;
 	t_atk			atk;			
 }	t_general;
 
@@ -227,6 +228,7 @@ void	fill_general(void)
 	general->atk.mana_ready = false;
 	general->cannon_ready = false;
 	general->spider_on_the_way = false;
+	general->wait_spider_on_the_way = 0;
 }
 
 void	update_general(int	tours)
@@ -784,8 +786,8 @@ void	set_up_1(t_general *general, t_patrouille *patrouille)
 	vector <t_hero>		*list_hero;
 	t_hero				hero;
 	int					found = false;
-	int					xA = 12900;
-	int					yA = 8000;
+	int					xA = 12800;
+	int					yA = 8700;
 	static int			max_control = 0;
 
 	list_monstre = _monstre();
@@ -833,7 +835,7 @@ void	set_up(t_general *general, t_patrouille *patrouille)
 void	init_patrouille_coor(t_general *general, t_patrouille *patrouille)
 {
 	int xA = 11700;
-	int yA = 8000;
+	int yA = 8700;
 	int xB = 14500;
 	int yB = 4000;
 
@@ -922,13 +924,12 @@ int	cannon_2(t_general *general)
 				cible_y = hero.coor.y + 9000 - general->base_y - monstre.coor.y;
 				printf("SPELL WIND %d %d\n", cible_x, cible_y);
 				general->cannon_ready = false;
+				general->spider_on_the_way = false;
 				return (SUCCESS);
 			}
 	}
 	return (FAILURE);
 }
-
-
 
 int	ammo_available(t_general *general)
 {
@@ -1001,15 +1002,34 @@ int find_spider_to_control(t_general *general, t_patrouille patrouille)
 		monstre = (*list_monstre)[i];
 		if (calculate_distance(monstre.coor.x, monstre.coor.y, hero.coor.x, hero.coor.y) <= 2200
 			&& general->mana >= 40
-			&& monstre.threat.near_base == 0)
+			&& monstre.threat.near_base == 0
+			&& monstre.threat.threat_for != 2)
 		{
 			general->spider_on_the_way = true;
-			printf("SPELL CONTROL %d %d %d\n", monstre.id, patrouille.xA, patrouille.yA);
+			if (general->base_x == 0) 
+				printf("SPELL CONTROL %d %d %d\n", monstre.id, patrouille.xA + 1000, patrouille.yA);
+			else
+				printf("SPELL CONTROL %d %d %d\n", monstre.id, patrouille.xA - 1000, patrouille.yA);
 			return (SUCCESS);
 		}
 
 	}
 	return (FAILURE);
+}
+
+void	move_and_wait_spider_on_the_way(t_general *general, t_patrouille patrouille)
+{
+	if (general->wait_spider_on_the_way < 10 * 2) //*2 car 2 heros passe dessus
+	{
+		move_to(patrouille.xA, patrouille.yA);
+		general->wait_spider_on_the_way++;
+	}
+	else
+	{
+		move_to(patrouille.xA, patrouille.yA);
+		general->wait_spider_on_the_way = 0;
+		general->spider_on_the_way = false;
+	}
 }
 
 void	attaquant(t_general *general)
@@ -1018,7 +1038,6 @@ void	attaquant(t_general *general)
 
 	init_patrouille_coor(general, &patrouille);
 	check_end_set_up(general, &patrouille);
-	//dprintf(2, "cannon ready = %d\n", general->cannon_ready);
 	if (general->atk.set_up == false)
 		set_up(general, &patrouille);
 	else if (cannon_2(general) == SUCCESS)
@@ -1029,13 +1048,14 @@ void	attaquant(t_general *general)
 		return ;
 	else if (ammo_available_future(general) == SUCCESS)
 		return ;
-	//spider on the way ici ?
+	else if (general->spider_on_the_way == true) //attendre ? tours max
+		move_and_wait_spider_on_the_way(general, patrouille);
 	else if (find_spider_to_control(general, patrouille) == SUCCESS)
 		return ;
-	else if (general->spider_on_the_way == true) //ici ou en haut
-		move_to(patrouille.xA, patrouille.yA);
+	else if (general->base_x == 0)
+		move_to(patrouille.xA - 800, patrouille.yA);
 	else
-		move_to(patrouille.xA - 1600, patrouille.yA);
+		move_to(patrouille.xA + 800, patrouille.yA);
 }
 
 void	check_mana(t_general *general)
